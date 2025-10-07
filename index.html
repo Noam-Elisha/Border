@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Editor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1e1e1e;
+            color: #ffffff;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            height: 100vh;
+        }
+
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #2d2d2d;
+            position: relative;
+        }
+
+        .image-container {
+            max-width: 80%;
+            max-height: 80%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 2px dashed #555;
+            border-radius: 8px;
+            padding: 20px;
+            background: #333;
+        }
+
+        .image-container.has-image {
+            border: none;
+            background: transparent;
+            padding: 0;
+            position: relative;
+            overflow: hidden;
+            border-radius: 0;
+        }
+
+        .display-image {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 2;
+        }
+
+        .blur-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            filter: blur(20px);
+            z-index: 0;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            pointer-events: none;
+        }
+
+        .blur-background.active {
+            opacity: 1;
+        }
+
+        .upload-area {
+            text-align: center;
+            cursor: pointer;
+            padding: 40px;
+            transition: all 0.2s ease;
+            transform: scale(1);
+            position: relative;
+            z-index: 3;
+        }
+
+        .upload-area:hover {
+            background: #444;
+        }
+
+        .upload-area:active {
+            transform: scale(0.98);
+            background: #555;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+            opacity: 0.7;
+        }
+
+        .upload-text {
+            font-size: 18px;
+            margin-bottom: 10px;
+            opacity: 0.9;
+        }
+
+        .upload-subtext {
+            font-size: 14px;
+            opacity: 0.6;
+        }
+
+        .sidebar {
+            width: 300px;
+            background: #252526;
+            border-left: 1px solid #3c3c3c;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            margin-bottom: 20px;
+            color: #cccccc;
+            font-size: 18px;
+            border-bottom: 1px solid #3c3c3c;
+            padding-bottom: 10px;
+        }
+
+        .control-group {
+            margin-bottom: 25px;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cccccc;
+            font-size: 14px;
+        }
+
+        .control-group input[type="file"] {
+            width: 100%;
+            padding: 8px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+
+        .control-group input[type="color"] {
+            width: 100%;
+            height: 40px;
+            padding: 0;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .control-group select {
+            width: 100%;
+            padding: 8px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #fff;
+            cursor: pointer;
+            margin-bottom: 10px;
+        }
+
+        .control-group input[type="range"] {
+            width: 100%;
+            margin-bottom: 10px;
+            -webkit-appearance: none;
+            appearance: none;
+            height: 6px;
+            background: #3c3c3c;
+            border-radius: 0;
+            outline: none;
+        }
+
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #007acc;
+            border-radius: 0;
+            cursor: pointer;
+        }
+
+        .control-group input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            background: #007acc;
+            border-radius: 0;
+            cursor: pointer;
+            border: none;
+        }
+
+        .range-value {
+            display: inline-block;
+            min-width: 40px;
+            text-align: center;
+            background: #3c3c3c;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #fff;
+        }
+
+        .control-group button {
+            width: 100%;
+            padding: 10px;
+            background: #007acc;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            margin-bottom: 8px;
+            transition: background-color 0.3s;
+        }
+
+        .control-group button:hover {
+            background: #005a9e;
+        }
+
+        .control-group button.secondary {
+            background: #555;
+        }
+
+        .control-group button.secondary:hover {
+            background: #666;
+        }
+
+        .hidden-input {
+            display: none;
+        }
+
+        .image-info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+        }
+
+        .dimensions-info {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 12px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="main-content">
+            <div class="image-container" id="imageContainer">
+                <div class="blur-background" id="blurBackground"></div>
+                <div class="upload-area" id="uploadArea">
+                    <div class="upload-icon">📷</div>
+                    <div class="upload-text">Click to upload an image</div>
+                    <div class="upload-subtext">or drag and drop</div>
+                </div>
+                <img id="displayImage" class="display-image" style="display: none;" />
+            </div>
+            <div class="image-info" id="imageInfo" style="display: none;"></div>
+            <div class="dimensions-info" id="dimensionsInfo" style="display: none;"></div>
+        </div>
+
+        <div class="sidebar">
+            <h2>Controls</h2>
+            
+            <div class="control-group">
+                <input type="file" id="fileInput" accept="image/*" class="hidden-input">
+                <button onclick="document.getElementById('fileInput').click()">Choose File</button>
+                <button class="secondary" onclick="clearImage()">Clear Image</button>
+                <button onclick="exportImage()">Export Image</button>
+            </div>
+
+            <h2>Border Controls</h2>
+            
+            <div class="control-group">
+                <label>Border Width: <span class="range-value" id="borderWidthValue">0</span>%</label>
+                <input type="range" id="borderWidth" min="0" max="100" value="0" oninput="applyBorderFast()">
+            </div>
+            
+            <div class="control-group">
+                <label>Background Type:</label>
+                <select id="backgroundType" onchange="toggleBackgroundType()">
+                    <option value="color">Solid Color</option>
+                    <option value="blur">Blur Background</option>
+                </select>
+            </div>
+            
+            <div class="control-group" id="colorGroup">
+                <label>Border Color:</label>
+                <input type="color" id="borderColor" value="#ffffff" onchange="applyBorderFast()">
+            </div>
+            
+        </div>
+
+
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const displayImage = document.getElementById('displayImage');
+        const imageContainer = document.getElementById('imageContainer');
+        const uploadArea = document.getElementById('uploadArea');
+        const imageInfo = document.getElementById('imageInfo');
+
+        // File input change event
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        });
+
+        // Drag and drop functionality
+        uploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            uploadArea.style.background = '#444';
+        });
+
+        uploadArea.addEventListener('dragleave', function(e) {
+            uploadArea.style.background = '';
+        });
+
+        uploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            uploadArea.style.background = '';
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                loadImage(file);
+            }
+        });
+
+        // Click to upload
+        uploadArea.addEventListener('click', function() {
+            fileInput.click();
+        });
+
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                displayImage.src = e.target.result;
+                displayImage.style.display = 'block';
+                uploadArea.style.display = 'none';
+                imageContainer.classList.add('has-image');
+                
+                // Show image info
+                displayImage.onload = function() {
+                    // Cache values for performance
+                    originalPixels = this.naturalWidth * this.naturalHeight;
+                    originalFileSize = file.size;
+                    dimensionsInfo = document.getElementById('dimensionsInfo');
+                    
+                    // Set up blur background when image loads
+                    const blurBackground = document.getElementById('blurBackground');
+                    blurBackground.style.backgroundImage = `url(${displayImage.src})`;
+                    blurBackgroundReady = true;
+                    
+                    const kb = (file.size / 1024).toFixed(1);
+                    imageInfo.innerHTML = `
+                        <strong>${file.name}</strong><br>
+                        ${this.naturalWidth} × ${this.naturalHeight}px<br>
+                        ${kb} KB
+                    `;
+                    imageInfo.style.display = 'block';
+                    dimensionsInfo.style.display = 'block';
+                    updateDimensions();
+                };
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            // Clear image display
+            displayImage.style.display = 'none';
+            displayImage.src = '';
+            displayImage.removeAttribute('src');
+            
+            // Reset UI
+            uploadArea.style.display = 'block';
+            imageContainer.classList.remove('has-image');
+            imageInfo.style.display = 'none';
+            document.getElementById('dimensionsInfo').style.display = 'none';
+            
+            // Reset file input
+            fileInput.value = '';
+            
+            // Reset border controls
+            document.getElementById('borderWidth').value = 0;
+            document.getElementById('borderWidthValue').textContent = '0';
+            document.getElementById('borderColor').value = '#ffffff';
+            document.getElementById('backgroundType').value = 'color';
+            
+            // Clear blur background
+            const blurBackground = document.getElementById('blurBackground');
+            blurBackground.classList.remove('active');
+            blurBackground.style.backgroundImage = '';
+            blurBackground.style.transform = '';
+            
+            toggleBackgroundType();
+            
+            // Clear cached values
+            originalPixels = null;
+            originalFileSize = null;
+            dimensionsInfo = null;
+            blurBackgroundReady = false;
+        }
+
+        // Cache DOM elements and calculations for better performance
+        let dimensionsInfo, originalPixels, originalFileSize, blurBackgroundReady = false;
+
+        function toggleBackgroundType() {
+            const backgroundType = document.getElementById('backgroundType').value;
+            const colorGroup = document.getElementById('colorGroup');
+            const blurBackground = document.getElementById('blurBackground');
+            
+            if (backgroundType === 'color') {
+                colorGroup.style.display = 'block';
+                blurBackground.classList.remove('active');
+            } else {
+                colorGroup.style.display = 'none';
+            }
+            
+            // Apply border with new background type
+            if (displayImage.src) {
+                applyBorderFast();
+            }
+        }
+
+        function applyBorderFast() {
+            const borderPercent = document.getElementById('borderWidth').value;
+            
+            // Update display value
+            document.getElementById('borderWidthValue').textContent = borderPercent;
+            
+            if (displayImage.src) {
+                // Calculate border width so that 100% = image width doubles
+                // At 100%, border should be 50% of original width on each side
+                const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * .05;
+                const backgroundType = document.getElementById('backgroundType').value;
+                
+                if (backgroundType === 'color') {
+                    const borderColor = document.getElementById('borderColor').value;
+                    displayImage.style.border = `${borderWidthPx}px solid ${borderColor}`;
+                    displayImage.style.boxShadow = 'none';
+                } else {
+                    // Use blur background
+                    displayImage.style.border = `${borderWidthPx}px solid transparent`;
+                    displayImage.style.boxShadow = 'none';
+                    
+                    // Just adjust blur background positioning (already set up in loadImage)
+                    const blurBackground = document.getElementById('blurBackground');
+                    blurBackground.classList.add('active');
+                    
+                    // Adjust blur background scale to account for border
+                    const scaleX = (displayImage.naturalWidth + borderWidthPx * 2) / displayImage.naturalWidth;
+                    const scaleY = (displayImage.naturalHeight + borderWidthPx * 2) / displayImage.naturalHeight;
+                    blurBackground.style.transform = `scale(${Math.max(scaleX, scaleY)})`;
+                }
+                
+                // Update dimensions in real-time with cached values
+                if (originalPixels && originalFileSize) {
+                    const totalWidth = displayImage.naturalWidth + (borderWidthPx * 2);
+                    const totalHeight = displayImage.naturalHeight + (borderWidthPx * 2);
+                    const newPixels = totalWidth * totalHeight;
+                    const pixelRatio = newPixels / originalPixels;
+                    const estimatedSize = (originalFileSize * pixelRatio / 1024).toFixed(1);
+                    
+                    dimensionsInfo.innerHTML = `
+                        <strong>With Border:</strong><br>
+                        ${totalWidth} × ${totalHeight}px<br>
+                        ${estimatedSize} KB
+                    `;
+                }
+            }
+        }
+
+
+
+        function updateBorderPreview() {
+            applyBorderFast();
+        }
+
+        function applyBorder() {
+            applyBorderFast();
+        }
+
+        function updateDimensions() {
+            applyBorderFast();
+        }
+
+        function exportImage() {
+            if (!displayImage.src) {
+                alert('Please load an image first');
+                return;
+            }
+
+            // Show loading state
+            const exportBtn = document.querySelector('button[onclick="exportImage()"]');
+            const originalText = exportBtn.textContent;
+            const originalCursor = document.body.style.cursor;
+            
+            exportBtn.textContent = 'Exporting...';
+            exportBtn.disabled = true;
+            document.body.style.cursor = 'wait';
+
+            // Use setTimeout to allow UI to update before heavy processing
+            setTimeout(() => {
+                try {
+                    const borderPercent = document.getElementById('borderWidth').value;
+                    const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * 0.5;
+                    
+                    // Create canvas with border
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d', { alpha: false });
+                    
+                    // Set canvas size to include border
+                    const totalWidth = displayImage.naturalWidth + (borderWidthPx * 2);
+                    const totalHeight = displayImage.naturalHeight + (borderWidthPx * 2);
+                    canvas.width = totalWidth;
+                    canvas.height = totalHeight;
+                    
+                    const backgroundType = document.getElementById('backgroundType').value;
+                    
+                    if (backgroundType === 'color') {
+                        // Fill with solid color
+                        const borderColor = document.getElementById('borderColor').value;
+                        ctx.fillStyle = borderColor;
+                        ctx.fillRect(0, 0, totalWidth, totalHeight);
+                    } else {
+                        // Create blur background
+                        ctx.filter = 'blur(20px)';
+                        ctx.drawImage(displayImage, -borderWidthPx, -borderWidthPx, totalWidth + borderWidthPx * 2, totalHeight + borderWidthPx * 2);
+                        ctx.filter = 'none';
+                    }
+                    
+                    // Draw image centered
+                    ctx.drawImage(displayImage, Math.floor(borderWidthPx), Math.floor(borderWidthPx));
+                    
+                    // Download the image
+                    const dataURL = canvas.toDataURL('image/png');
+                    const a = document.createElement('a');
+                    a.href = dataURL;
+                    a.download = 'image-with-border.png';
+                    a.click();
+                    
+                } finally {
+                    // Reset UI state
+                    exportBtn.textContent = originalText;
+                    exportBtn.disabled = false;
+                    document.body.style.cursor = originalCursor;
+                }
+            }, 10);
+        }
+    </script>
+</body>
+</html>
