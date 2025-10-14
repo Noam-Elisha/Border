@@ -396,9 +396,19 @@
                 
                 // Show image info
                 displayImage.onload = function() {
+                    // Reset aspect ratio borders for new image
+                    displayImage.aspectBorderLeft = 0;
+                    displayImage.aspectBorderRight = 0;
+                    displayImage.aspectBorderTop = 0;
+                    displayImage.aspectBorderBottom = 0;
+                    displayImage.aspectRatioX = null;
+                    displayImage.aspectRatioY = null;
+                    
                     // Cache values for performance
                     originalPixels = this.naturalWidth * this.naturalHeight;
                     originalFileSize = file.size;
+                    originalFileName = file.name;
+                    originalFileType = file.type;
                     dimensionsInfo = document.getElementById('dimensionsInfo');
                     
                     // Set up blur background when image loads
@@ -440,6 +450,7 @@
             document.getElementById('borderWidthValue').textContent = '0';
             document.getElementById('borderColor').value = '#ffffff';
             document.getElementById('backgroundType').value = 'color';
+            document.getElementById('aspectRatio').value = 'original';
             
             // Clear blur background
             const blurBackground = document.getElementById('blurBackground');
@@ -452,12 +463,22 @@
             // Clear cached values
             originalPixels = null;
             originalFileSize = null;
+            originalFileName = null;
+            originalFileType = null;
             dimensionsInfo = null;
             blurBackgroundReady = false;
+            
+            // Clear aspect ratio borders
+            displayImage.aspectBorderLeft = 0;
+            displayImage.aspectBorderRight = 0;
+            displayImage.aspectBorderTop = 0;
+            displayImage.aspectBorderBottom = 0;
+            displayImage.aspectRatioX = null;
+            displayImage.aspectRatioY = null;
         }
 
         // Cache DOM elements and calculations for better performance
-        let dimensionsInfo, originalPixels, originalFileSize, blurBackgroundReady = false;
+        let dimensionsInfo, originalPixels, originalFileSize, originalFileName, originalFileType, blurBackgroundReady = false;
 
         function toggleBackgroundType() {
             const backgroundType = document.getElementById('backgroundType').value;
@@ -498,6 +519,8 @@
                 // Check if we have stored aspect ratio values
                 const hasAspectRatio = displayImage.aspectRatioX && displayImage.aspectRatioY;
                 
+
+                
                 let finalBorderLeft, finalBorderRight, finalBorderTop, finalBorderBottom;
                 
                 if (hasAspectRatio) {
@@ -533,6 +556,11 @@
                     finalBorderBottom = borderWidthPx;
                 }
                 
+                finalBorderLeft = Math.round(finalBorderLeft);
+                finalBorderRight = Math.round(finalBorderRight);
+                finalBorderTop = Math.round(finalBorderTop);
+                finalBorderBottom = Math.round(finalBorderBottom);
+                
                 // Calculate total dimensions for proper scaling
                 const totalWidth = displayImage.naturalWidth + finalBorderLeft + finalBorderRight;
                 const totalHeight = displayImage.naturalHeight + finalBorderTop + finalBorderBottom;
@@ -544,20 +572,22 @@
                 
                 const scaleToFit = Math.min(1, Math.min(containerMaxWidth / totalWidth, containerMaxHeight / totalHeight));
                 
+
+                
                 // Apply the borders and scaling
                 if (backgroundType === 'color') {
                     const borderColor = document.getElementById('borderColor').value;
-                    displayImage.style.borderLeft = `${finalBorderLeft * scaleToFit}px solid ${borderColor}`;
-                    displayImage.style.borderRight = `${finalBorderRight * scaleToFit}px solid ${borderColor}`;
-                    displayImage.style.borderTop = `${finalBorderTop * scaleToFit}px solid ${borderColor}`;
-                    displayImage.style.borderBottom = `${finalBorderBottom * scaleToFit}px solid ${borderColor}`;
+                    displayImage.style.borderLeft = `${Math.round(finalBorderLeft * scaleToFit)}px solid ${borderColor}`;
+                    displayImage.style.borderRight = `${Math.round(finalBorderRight * scaleToFit)}px solid ${borderColor}`;
+                    displayImage.style.borderTop = `${Math.round(finalBorderTop * scaleToFit)}px solid ${borderColor}`;
+                    displayImage.style.borderBottom = `${Math.round(finalBorderBottom * scaleToFit)}px solid ${borderColor}`;
                     displayImage.style.boxShadow = 'none';
                 } else {
                     // Use blur background
-                    displayImage.style.borderLeft = `${finalBorderLeft * scaleToFit}px solid transparent`;
-                    displayImage.style.borderRight = `${finalBorderRight * scaleToFit}px solid transparent`;
-                    displayImage.style.borderTop = `${finalBorderTop * scaleToFit}px solid transparent`;
-                    displayImage.style.borderBottom = `${finalBorderBottom * scaleToFit}px solid transparent`;
+                    displayImage.style.borderLeft = `${Math.round(finalBorderLeft * scaleToFit)}px solid transparent`;
+                    displayImage.style.borderRight = `${Math.round(finalBorderRight * scaleToFit)}px solid transparent`;
+                    displayImage.style.borderTop = `${Math.round(finalBorderTop * scaleToFit)}px solid transparent`;
+                    displayImage.style.borderBottom = `${Math.round(finalBorderBottom * scaleToFit)}px solid transparent`;
                     displayImage.style.boxShadow = 'none';
                     
                     // Just adjust blur background positioning (already set up in loadImage)
@@ -590,16 +620,6 @@
             }
         }
 
-
-
-        function updateBorderPreview() {
-            applyBorderFast();
-        }
-
-        function applyBorder() {
-            applyBorderFast();
-        }
-
         function updateDimensions() {
             applyBorderFast();
         }
@@ -613,7 +633,9 @@
             } else {
                 customGroup.style.display = 'none';
                 // Apply the selected preset ratio immediately
-                applyAspectRatio();
+                if (displayImage.src) {
+                    setTimeout(() => applyAspectRatio(), 0);
+                }
             }
         }
 
@@ -624,11 +646,6 @@
                 return; // No image loaded
             }
             
-            // TODO: Implement aspect ratio logic here
-            // You can access the selected ratio with: aspectRatio
-            // Current image dimensions: displayImage.naturalWidth, displayImage.naturalHeight
-            
-
             const width = displayImage.naturalWidth;
             const height = displayImage.naturalHeight;
 
@@ -697,9 +714,12 @@
             
             // Apply borders through applyBorderFast
             applyBorderFast();
+            applyBorderFast();
+            
+            // Force a DOM refresh to ensure visual update
+            displayImage.offsetHeight;
 
-            console.log('New dimensions:', newWidth, newHeight);
-            console.log('Selected aspect ratio:', aspectRatio);
+
         }
 
         function exportImage() {
@@ -800,11 +820,25 @@
                     // Draw image centered with proper border positioning
                     ctx.drawImage(displayImage, Math.floor(finalBorderLeft), Math.floor(finalBorderTop));
                     
-                    // Download the image
-                    const dataURL = canvas.toDataURL('image/png');
+                    // Download the image using original format
+                    const mimeType = originalFileType || 'image/png';
+                    const quality = mimeType === 'image/jpeg' ? 0.95 : undefined; // High quality for JPEG
+                    const dataURL = canvas.toDataURL(mimeType, quality);
+                    
+                    // Generate filename with original extension
+                    let filename = 'image-with-border';
+                    if (originalFileName) {
+                        const nameWithoutExt = originalFileName.replace(/\.[^/.]+$/, "");
+                        const ext = originalFileName.split('.').pop();
+                        filename = `${nameWithoutExt}-with-border.${ext}`;
+                    } else {
+                        const ext = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];
+                        filename = `${filename}.${ext}`;
+                    }
+                    
                     const a = document.createElement('a');
                     a.href = dataURL;
-                    a.download = 'image-with-border.png';
+                    a.download = filename;
                     a.click();
                     
                 } finally {
