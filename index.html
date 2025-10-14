@@ -477,22 +477,36 @@
                 const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * .05;
                 const backgroundType = document.getElementById('backgroundType').value;
                 
+                // Get stored aspect ratio border values or default to 0
+                const aspectLeft = displayImage.aspectBorderLeft || 0;
+                const aspectRight = displayImage.aspectBorderRight || 0;
+                const aspectTop = displayImage.aspectBorderTop || 0;
+                const aspectBottom = displayImage.aspectBorderBottom || 0;
+                
                 if (backgroundType === 'color') {
                     const borderColor = document.getElementById('borderColor').value;
-                    displayImage.style.border = `${borderWidthPx}px solid ${borderColor}`;
+                    displayImage.style.borderLeft = `${borderWidthPx + aspectLeft}px solid ${borderColor}`;
+                    displayImage.style.borderRight = `${borderWidthPx + aspectRight}px solid ${borderColor}`;
+                    displayImage.style.borderTop = `${borderWidthPx + aspectTop}px solid ${borderColor}`;
+                    displayImage.style.borderBottom = `${borderWidthPx + aspectBottom}px solid ${borderColor}`;
                     displayImage.style.boxShadow = 'none';
                 } else {
                     // Use blur background
-                    displayImage.style.border = `${borderWidthPx}px solid transparent`;
+                    displayImage.style.borderLeft = `${borderWidthPx + aspectLeft}px solid transparent`;
+                    displayImage.style.borderRight = `${borderWidthPx + aspectRight}px solid transparent`;
+                    displayImage.style.borderTop = `${borderWidthPx + aspectTop}px solid transparent`;
+                    displayImage.style.borderBottom = `${borderWidthPx + aspectBottom}px solid transparent`;
                     displayImage.style.boxShadow = 'none';
                     
                     // Just adjust blur background positioning (already set up in loadImage)
                     const blurBackground = document.getElementById('blurBackground');
                     blurBackground.classList.add('active');
                     
-                    // Adjust blur background scale to account for border
-                    const scaleX = (displayImage.naturalWidth + borderWidthPx * 2) / displayImage.naturalWidth;
-                    const scaleY = (displayImage.naturalHeight + borderWidthPx * 2) / displayImage.naturalHeight;
+                    // Adjust blur background scale to account for total border
+                    const maxBorderX = Math.max(borderWidthPx + aspectLeft, borderWidthPx + aspectRight);
+                    const maxBorderY = Math.max(borderWidthPx + aspectTop, borderWidthPx + aspectBottom);
+                    const scaleX = (displayImage.naturalWidth + maxBorderX * 2) / displayImage.naturalWidth;
+                    const scaleY = (displayImage.naturalHeight + maxBorderY * 2) / displayImage.naturalHeight;
                     blurBackground.style.transform = `scale(${Math.max(scaleX, scaleY)})`;
                 }
                 
@@ -568,14 +582,18 @@
                 }
             }
 
-            // Apply new dimensions
-            const widthDiff = Math.abs(newWidth - width);
-            const heightDiff = Math.abs(newHeight - height);
-            const borderColor = document.getElementById('borderColor').value;
-            displayImage.style.borderLeft = `${widthDiff / 2}px solid ${borderColor}`;
-            displayImage.style.borderRight = `${widthDiff / 2}px solid ${borderColor}`;
-            displayImage.style.borderTop = `${heightDiff / 2}px solid ${borderColor}`;
-            displayImage.style.borderBottom = `${heightDiff / 2}px solid ${borderColor}`;
+            // Store aspect ratio border values for applyBorderFast to use
+            const widthDiff = newWidth - width;
+            const heightDiff = newHeight - height;
+            
+            // Store the aspect ratio borders separately
+            displayImage.aspectBorderLeft = widthDiff / 2;
+            displayImage.aspectBorderRight = widthDiff / 2;
+            displayImage.aspectBorderTop = heightDiff / 2;
+            displayImage.aspectBorderBottom = heightDiff / 2;
+            
+            // Apply borders through applyBorderFast
+            applyBorderFast();
 
             console.log('New dimensions:', newWidth, newHeight);
             console.log('Selected aspect ratio:', aspectRatio);
