@@ -56,12 +56,13 @@
         }
 
         .display-image {
-            max-width: 100%;
-            max-height: 100%;
+            width: 100%;
+            height: 100%;
             object-fit: contain;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
             position: relative;
             z-index: 2;
+            display: block;
         }
 
         .blur-background {
@@ -485,7 +486,7 @@
             if (displayImage.src) {
                 // Calculate border width so that 100% = image width doubles
                 // At 100%, border should be 50% of original width on each side
-                const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * .05;
+                const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * .5;
                 const backgroundType = document.getElementById('backgroundType').value;
                 
                 // Get stored aspect ratio border values or default to 0
@@ -532,19 +533,31 @@
                     finalBorderBottom = borderWidthPx;
                 }
                 
+                // Calculate total dimensions for proper scaling
+                const totalWidth = displayImage.naturalWidth + finalBorderLeft + finalBorderRight;
+                const totalHeight = displayImage.naturalHeight + finalBorderTop + finalBorderBottom;
+                
+                // Only scale if the image with borders exceeds the viewport
+                const container = imageContainer;
+                const containerMaxWidth = container.clientWidth * 0.9;
+                const containerMaxHeight = container.clientHeight * 0.9;
+                
+                const scaleToFit = Math.min(1, Math.min(containerMaxWidth / totalWidth, containerMaxHeight / totalHeight));
+                
+                // Apply the borders and scaling
                 if (backgroundType === 'color') {
                     const borderColor = document.getElementById('borderColor').value;
-                    displayImage.style.borderLeft = `${finalBorderLeft}px solid ${borderColor}`;
-                    displayImage.style.borderRight = `${finalBorderRight}px solid ${borderColor}`;
-                    displayImage.style.borderTop = `${finalBorderTop}px solid ${borderColor}`;
-                    displayImage.style.borderBottom = `${finalBorderBottom}px solid ${borderColor}`;
+                    displayImage.style.borderLeft = `${finalBorderLeft * scaleToFit}px solid ${borderColor}`;
+                    displayImage.style.borderRight = `${finalBorderRight * scaleToFit}px solid ${borderColor}`;
+                    displayImage.style.borderTop = `${finalBorderTop * scaleToFit}px solid ${borderColor}`;
+                    displayImage.style.borderBottom = `${finalBorderBottom * scaleToFit}px solid ${borderColor}`;
                     displayImage.style.boxShadow = 'none';
                 } else {
                     // Use blur background
-                    displayImage.style.borderLeft = `${finalBorderLeft}px solid transparent`;
-                    displayImage.style.borderRight = `${finalBorderRight}px solid transparent`;
-                    displayImage.style.borderTop = `${finalBorderTop}px solid transparent`;
-                    displayImage.style.borderBottom = `${finalBorderBottom}px solid transparent`;
+                    displayImage.style.borderLeft = `${finalBorderLeft * scaleToFit}px solid transparent`;
+                    displayImage.style.borderRight = `${finalBorderRight * scaleToFit}px solid transparent`;
+                    displayImage.style.borderTop = `${finalBorderTop * scaleToFit}px solid transparent`;
+                    displayImage.style.borderBottom = `${finalBorderBottom * scaleToFit}px solid transparent`;
                     displayImage.style.boxShadow = 'none';
                     
                     // Just adjust blur background positioning (already set up in loadImage)
@@ -710,13 +723,57 @@
                     const borderPercent = document.getElementById('borderWidth').value;
                     const borderWidthPx = (borderPercent / 100) * displayImage.naturalWidth * 0.5;
                     
-                    // Create canvas with border
+                    // Get stored aspect ratio border values or default to 0 (same as preview)
+                    const aspectLeft = displayImage.aspectBorderLeft || 0;
+                    const aspectRight = displayImage.aspectBorderRight || 0;
+                    const aspectTop = displayImage.aspectBorderTop || 0;
+                    const aspectBottom = displayImage.aspectBorderBottom || 0;
+                    
+                    // Check if we have stored aspect ratio values
+                    const hasAspectRatio = displayImage.aspectRatioX && displayImage.aspectRatioY;
+                    
+                    let finalBorderLeft, finalBorderRight, finalBorderTop, finalBorderBottom;
+                    
+                    if (hasAspectRatio) {
+                        // Use the same logic as applyBorderFast for consistency
+                        const ratioX = displayImage.aspectRatioX;
+                        const ratioY = displayImage.aspectRatioY;
+                        
+                        // Determine which dimension is shorter in the aspect ratio
+                        const isXShorter = ratioX <= ratioY;
+                        
+                        if (isXShorter) {
+                            // X is shorter, add borderWidthPx to X and calculate proportional Y
+                            const additionalY = borderWidthPx * (ratioY / ratioX);
+                            
+                            finalBorderLeft = aspectLeft + borderWidthPx / 2;
+                            finalBorderRight = aspectRight + borderWidthPx / 2;
+                            finalBorderTop = aspectTop + additionalY / 2;
+                            finalBorderBottom = aspectBottom + additionalY / 2;
+                        } else {
+                            // Y is shorter, add borderWidthPx to Y and calculate proportional X
+                            const additionalX = borderWidthPx * (ratioX / ratioY);
+                            
+                            finalBorderLeft = aspectLeft + additionalX / 2;
+                            finalBorderRight = aspectRight + additionalX / 2;
+                            finalBorderTop = aspectTop + borderWidthPx / 2;
+                            finalBorderBottom = aspectBottom + borderWidthPx / 2;
+                        }
+                    } else {
+                        // No aspect ratio, use uniform border
+                        finalBorderLeft = borderWidthPx;
+                        finalBorderRight = borderWidthPx;
+                        finalBorderTop = borderWidthPx;
+                        finalBorderBottom = borderWidthPx;
+                    }
+                    
+                    // Create canvas with border at full resolution
                     const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d', { alpha: false });
+                    const ctx = canvas.getContext('2d');
                     
                     // Set canvas size to include border
-                    const totalWidth = displayImage.naturalWidth + (borderWidthPx * 2);
-                    const totalHeight = displayImage.naturalHeight + (borderWidthPx * 2);
+                    const totalWidth = displayImage.naturalWidth + finalBorderLeft + finalBorderRight;
+                    const totalHeight = displayImage.naturalHeight + finalBorderTop + finalBorderBottom;
                     canvas.width = totalWidth;
                     canvas.height = totalHeight;
                     
@@ -728,14 +785,20 @@
                         ctx.fillStyle = borderColor;
                         ctx.fillRect(0, 0, totalWidth, totalHeight);
                     } else {
-                        // Create blur background
+                        // Create blur background - draw the image larger and blurred first
                         ctx.filter = 'blur(20px)';
-                        ctx.drawImage(displayImage, -borderWidthPx, -borderWidthPx, totalWidth + borderWidthPx * 2, totalHeight + borderWidthPx * 2);
+                        // Draw background image scaled to cover entire canvas
+                        const bgScale = Math.max(totalWidth / displayImage.naturalWidth, totalHeight / displayImage.naturalHeight);
+                        const bgWidth = displayImage.naturalWidth * bgScale;
+                        const bgHeight = displayImage.naturalHeight * bgScale;
+                        const bgX = (totalWidth - bgWidth) / 2;
+                        const bgY = (totalHeight - bgHeight) / 2;
+                        ctx.drawImage(displayImage, bgX, bgY, bgWidth, bgHeight);
                         ctx.filter = 'none';
                     }
                     
-                    // Draw image centered
-                    ctx.drawImage(displayImage, Math.floor(borderWidthPx), Math.floor(borderWidthPx));
+                    // Draw image centered with proper border positioning
+                    ctx.drawImage(displayImage, Math.floor(finalBorderLeft), Math.floor(finalBorderTop));
                     
                     // Download the image
                     const dataURL = canvas.toDataURL('image/png');
