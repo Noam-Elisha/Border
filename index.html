@@ -302,7 +302,7 @@
             
             <div class="control-group">
                 <label>Border Width: <span class="range-value" id="borderWidthValue">0</span>%</label>
-                <input type="range" id="borderWidth" min="0" max="100" value="0" oninput="applyBorderFast()">
+                <input type="range" id="borderWidth" min="0" max="100" value="0" oninput="throttledApplyBorder()">
             </div>
             
             <div class="control-group">
@@ -479,6 +479,20 @@
 
         // Cache DOM elements and calculations for better performance
         let dimensionsInfo, originalPixels, originalFileSize, originalFileName, originalFileType, blurBackgroundReady = false;
+        
+        // Throttle border updates for smoother slider performance
+        let borderUpdateTimeout;
+        function throttledApplyBorder() {
+            // Update the display value immediately for responsive feedback
+            const borderPercent = document.getElementById('borderWidth').value;
+            document.getElementById('borderWidthValue').textContent = borderPercent;
+            
+            // Throttle the actual border application
+            clearTimeout(borderUpdateTimeout);
+            borderUpdateTimeout = setTimeout(() => {
+                applyBorderFast();
+            }, 3); // ~60fps
+        }
 
         function toggleBackgroundType() {
             const backgroundType = document.getElementById('backgroundType').value;
