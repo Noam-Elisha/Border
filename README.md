@@ -9,7 +9,7 @@ A simple web-based tool for adding borders to images. Load an image, adjust the 
 - Choose border colors with a color picker
 - Add background blur behind the image
 - Select aspect ratios for social media (Instagram square, story format, etc.)
-- Export images as PNG files
+- Export images with border
 - Works entirely in the browser - no uploads required
 
 ## Usage
