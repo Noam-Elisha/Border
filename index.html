@@ -317,6 +317,19 @@
                 <input type="color" id="borderColor" value="#ffffff" onchange="applyBorderFast()">
             </div>
             
+            <div class="control-group">
+                <label>Aspect Ratio:</label>
+                <select id="aspectRatio" onchange="applyAspectRatio()">
+                    <option value="original">Original</option>
+                    <option value="1:1">1:1 (Square)</option>
+                    <option value="3:2">3:2</option>
+                    <option value="4:3">4:3</option>
+                    <option value="1.91:1">1.91:1 (Instagram)</option>
+                    <option value="4:5">4:5 (Instagram)</option>
+                    <option value="16:9">16:9</option>
+                </select>
+            </div>
+            
         </div>
 
 
@@ -493,7 +506,8 @@
                     
                     dimensionsInfo.innerHTML = `
                         <strong>With Border:</strong><br>
-                        ${totalWidth} × ${totalHeight}px<br>
+
+                        ${Math.round(totalWidth)} × ${Math.round(totalHeight)}px<br>
                         ${estimatedSize} KB
                     `;
                 }
@@ -512,6 +526,59 @@
 
         function updateDimensions() {
             applyBorderFast();
+        }
+
+        function applyAspectRatio() {
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            
+            if (!displayImage.src) {
+                return; // No image loaded
+            }
+            
+            // TODO: Implement aspect ratio logic here
+            // You can access the selected ratio with: aspectRatio
+            // Current image dimensions: displayImage.naturalWidth, displayImage.naturalHeight
+            
+
+            const width = displayImage.naturalWidth;
+            const height = displayImage.naturalHeight;
+
+            // Calculate new dimensions based on aspect ratio
+            let newWidth = width;
+            let newHeight = height;
+            const [ratioX, ratioY] = aspectRatio.split(':').map(Number);
+            if (aspectRatio === 'original') {
+                newWidth = width;
+                newHeight = height;
+            } else {
+                if (!isNaN(ratioX) && !isNaN(ratioY) && ratioX > 0 && ratioY > 0) {
+                    // Calculate based on width
+                    let calcHeight = Math.round(width * (ratioY / ratioX));
+                    // Calculate based on height
+                    let calcWidth = Math.round(height * (ratioX / ratioY));
+
+                    // Choose the one that is greater than or equal to original dimensions
+                    if (calcHeight >= height && width >= width) {
+                        newWidth = width;
+                        newHeight = calcHeight;
+                    } else if (calcWidth >= width && height >= height) {
+                        newWidth = calcWidth;
+                        newHeight = height;
+                    } 
+                }
+            }
+
+            // Apply new dimensions
+            const widthDiff = Math.abs(newWidth - width);
+            const heightDiff = Math.abs(newHeight - height);
+            const borderColor = document.getElementById('borderColor').value;
+            displayImage.style.borderLeft = `${widthDiff / 2}px solid ${borderColor}`;
+            displayImage.style.borderRight = `${widthDiff / 2}px solid ${borderColor}`;
+            displayImage.style.borderTop = `${heightDiff / 2}px solid ${borderColor}`;
+            displayImage.style.borderBottom = `${heightDiff / 2}px solid ${borderColor}`;
+
+            console.log('New dimensions:', newWidth, newHeight);
+            console.log('Selected aspect ratio:', aspectRatio);
         }
 
         function exportImage() {
