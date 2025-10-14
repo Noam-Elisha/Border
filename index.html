@@ -319,7 +319,7 @@
             
             <div class="control-group">
                 <label>Aspect Ratio:</label>
-                <select id="aspectRatio" onchange="applyAspectRatio()">
+                <select id="aspectRatio" onchange="toggleCustomAspectRatio()">
                     <option value="original">Original</option>
                     <option value="1:1">1:1 (Square)</option>
                     <option value="3:2">3:2</option>
@@ -327,7 +327,18 @@
                     <option value="1.91:1">1.91:1 (Instagram)</option>
                     <option value="4:5">4:5 (Instagram)</option>
                     <option value="16:9">16:9</option>
+                    <option value="custom">Custom</option>
                 </select>
+            </div>
+            
+            <div class="control-group" id="customAspectGroup" style="display: none;">
+                <label>Custom Ratio:</label>
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <input type="number" id="customRatioX" min="0.1" step="0.1" value="1" style="width: 60px; padding: 4px; background: #3c3c3c; border: 1px solid #555; border-radius: 4px; color: #fff;">
+                    <span>:</span>
+                    <input type="number" id="customRatioY" min="0.1" step="0.1" value="1" style="width: 60px; padding: 4px; background: #3c3c3c; border: 1px solid #555; border-radius: 4px; color: #fff;">
+                    <button type="button" onclick="applyAspectRatio()" style="padding: 4px 8px; margin: 0; width: auto; font-size: 12px;">Apply</button>
+                </div>
             </div>
             
         </div>
@@ -483,19 +494,57 @@
                 const aspectTop = displayImage.aspectBorderTop || 0;
                 const aspectBottom = displayImage.aspectBorderBottom || 0;
                 
+                // Check if we have stored aspect ratio values
+                const hasAspectRatio = displayImage.aspectRatioX && displayImage.aspectRatioY;
+                
+                let finalBorderLeft, finalBorderRight, finalBorderTop, finalBorderBottom;
+                
+                if (hasAspectRatio) {
+                    // Use stored aspect ratio to maintain proportions when adding border
+                    const ratioX = displayImage.aspectRatioX;
+                    const ratioY = displayImage.aspectRatioY;
+                    
+                    // Determine which dimension is shorter in the aspect ratio
+                    const isXShorter = ratioX <= ratioY;
+                    
+                    if (isXShorter) {
+                        // X is shorter, add borderWidthPx to X and calculate proportional Y
+                        const additionalY = borderWidthPx * (ratioY / ratioX);
+                        
+                        finalBorderLeft = aspectLeft + borderWidthPx / 2;
+                        finalBorderRight = aspectRight + borderWidthPx / 2;
+                        finalBorderTop = aspectTop + additionalY / 2;
+                        finalBorderBottom = aspectBottom + additionalY / 2;
+                    } else {
+                        // Y is shorter, add borderWidthPx to Y and calculate proportional X
+                        const additionalX = borderWidthPx * (ratioX / ratioY);
+                        
+                        finalBorderLeft = aspectLeft + additionalX / 2;
+                        finalBorderRight = aspectRight + additionalX / 2;
+                        finalBorderTop = aspectTop + borderWidthPx / 2;
+                        finalBorderBottom = aspectBottom + borderWidthPx / 2;
+                    }
+                } else {
+                    // No aspect ratio, use uniform border
+                    finalBorderLeft = borderWidthPx;
+                    finalBorderRight = borderWidthPx;
+                    finalBorderTop = borderWidthPx;
+                    finalBorderBottom = borderWidthPx;
+                }
+                
                 if (backgroundType === 'color') {
                     const borderColor = document.getElementById('borderColor').value;
-                    displayImage.style.borderLeft = `${borderWidthPx + aspectLeft}px solid ${borderColor}`;
-                    displayImage.style.borderRight = `${borderWidthPx + aspectRight}px solid ${borderColor}`;
-                    displayImage.style.borderTop = `${borderWidthPx + aspectTop}px solid ${borderColor}`;
-                    displayImage.style.borderBottom = `${borderWidthPx + aspectBottom}px solid ${borderColor}`;
+                    displayImage.style.borderLeft = `${finalBorderLeft}px solid ${borderColor}`;
+                    displayImage.style.borderRight = `${finalBorderRight}px solid ${borderColor}`;
+                    displayImage.style.borderTop = `${finalBorderTop}px solid ${borderColor}`;
+                    displayImage.style.borderBottom = `${finalBorderBottom}px solid ${borderColor}`;
                     displayImage.style.boxShadow = 'none';
                 } else {
                     // Use blur background
-                    displayImage.style.borderLeft = `${borderWidthPx + aspectLeft}px solid transparent`;
-                    displayImage.style.borderRight = `${borderWidthPx + aspectRight}px solid transparent`;
-                    displayImage.style.borderTop = `${borderWidthPx + aspectTop}px solid transparent`;
-                    displayImage.style.borderBottom = `${borderWidthPx + aspectBottom}px solid transparent`;
+                    displayImage.style.borderLeft = `${finalBorderLeft}px solid transparent`;
+                    displayImage.style.borderRight = `${finalBorderRight}px solid transparent`;
+                    displayImage.style.borderTop = `${finalBorderTop}px solid transparent`;
+                    displayImage.style.borderBottom = `${finalBorderBottom}px solid transparent`;
                     displayImage.style.boxShadow = 'none';
                     
                     // Just adjust blur background positioning (already set up in loadImage)
@@ -503,17 +552,17 @@
                     blurBackground.classList.add('active');
                     
                     // Adjust blur background scale to account for total border
-                    const maxBorderX = Math.max(borderWidthPx + aspectLeft, borderWidthPx + aspectRight);
-                    const maxBorderY = Math.max(borderWidthPx + aspectTop, borderWidthPx + aspectBottom);
+                    const maxBorderX = Math.max(finalBorderLeft, finalBorderRight);
+                    const maxBorderY = Math.max(finalBorderTop, finalBorderBottom);
                     const scaleX = (displayImage.naturalWidth + maxBorderX * 2) / displayImage.naturalWidth;
                     const scaleY = (displayImage.naturalHeight + maxBorderY * 2) / displayImage.naturalHeight;
                     blurBackground.style.transform = `scale(${Math.max(scaleX, scaleY)})`;
                 }
                 
-                // Update dimensions in real-time with cached values
+                // Update dimensions in real-time with cached values using actual final border values
                 if (originalPixels && originalFileSize) {
-                    const totalWidth = displayImage.naturalWidth + (borderWidthPx * 2);
-                    const totalHeight = displayImage.naturalHeight + (borderWidthPx * 2);
+                    const totalWidth = displayImage.naturalWidth + finalBorderLeft + finalBorderRight;
+                    const totalHeight = displayImage.naturalHeight + finalBorderTop + finalBorderBottom;
                     const newPixels = totalWidth * totalHeight;
                     const pixelRatio = newPixels / originalPixels;
                     const estimatedSize = (originalFileSize * pixelRatio / 1024).toFixed(1);
@@ -542,6 +591,19 @@
             applyBorderFast();
         }
 
+        function toggleCustomAspectRatio() {
+            const aspectRatio = document.getElementById('aspectRatio').value;
+            const customGroup = document.getElementById('customAspectGroup');
+            
+            if (aspectRatio === 'custom') {
+                customGroup.style.display = 'block';
+            } else {
+                customGroup.style.display = 'none';
+                // Apply the selected preset ratio immediately
+                applyAspectRatio();
+            }
+        }
+
         function applyAspectRatio() {
             const aspectRatio = document.getElementById('aspectRatio').value;
             
@@ -560,11 +622,26 @@
             // Calculate new dimensions based on aspect ratio
             let newWidth = width;
             let newHeight = height;
-            const [ratioX, ratioY] = aspectRatio.split(':').map(Number);
+            let ratioX, ratioY;
+            
             if (aspectRatio === 'original') {
                 newWidth = width;
                 newHeight = height;
+            } else if (aspectRatio === 'custom') {
+                // Get custom ratio values
+                ratioX = parseFloat(document.getElementById('customRatioX').value);
+                ratioY = parseFloat(document.getElementById('customRatioY').value);
+                
+                if (!ratioX || !ratioY || ratioX <= 0 || ratioY <= 0) {
+                    alert('Please enter valid positive numbers for the custom aspect ratio.');
+                    return;
+                }
             } else {
+                // Parse preset ratio
+                [ratioX, ratioY] = aspectRatio.split(':').map(Number);
+            }
+            
+            if (aspectRatio !== 'original') {
                 if (!isNaN(ratioX) && !isNaN(ratioY) && ratioX > 0 && ratioY > 0) {
                     // Calculate based on width
                     let calcHeight = Math.round(width * (ratioY / ratioX));
@@ -586,11 +663,24 @@
             const widthDiff = newWidth - width;
             const heightDiff = newHeight - height;
             
-            // Store the aspect ratio borders separately
-            displayImage.aspectBorderLeft = widthDiff / 2;
-            displayImage.aspectBorderRight = widthDiff / 2;
-            displayImage.aspectBorderTop = heightDiff / 2;
-            displayImage.aspectBorderBottom = heightDiff / 2;
+            if (aspectRatio === 'original') {
+                // Reset everything for original
+                displayImage.aspectBorderLeft = 0;
+                displayImage.aspectBorderRight = 0;
+                displayImage.aspectBorderTop = 0;
+                displayImage.aspectBorderBottom = 0;
+                displayImage.aspectRatioX = null;
+                displayImage.aspectRatioY = null;
+            } else {
+                // Store the aspect ratio borders separately
+                displayImage.aspectBorderLeft = widthDiff / 2;
+                displayImage.aspectBorderRight = widthDiff / 2;
+                displayImage.aspectBorderTop = heightDiff / 2;
+                displayImage.aspectBorderBottom = heightDiff / 2;
+                // Store the actual aspect ratio values for reuse
+                displayImage.aspectRatioX = ratioX;
+                displayImage.aspectRatioY = ratioY;
+            }
             
             // Apply borders through applyBorderFast
             applyBorderFast();
