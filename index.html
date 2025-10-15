@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Image Editor</title>
+    <!-- GeoTIFF library for TIFF file support -->
+    <script src="https://unpkg.com/geotiff@2.0.7/dist-browser/geotiff.js"></script>
     <style>
         * {
             margin: 0;
@@ -292,7 +294,7 @@
             <h2>Controls</h2>
             
             <div class="control-group">
-                <input type="file" id="fileInput" accept="image/*" class="hidden-input">
+                <input type="file" id="fileInput" accept="image/*,.tif,.tiff" class="hidden-input">
                 <button onclick="document.getElementById('fileInput').click()">Choose File</button>
                 <button class="secondary" onclick="clearImage()">Clear Image</button>
                 <button onclick="exportImage()">Export Image</button>
@@ -376,7 +378,9 @@
             e.preventDefault();
             uploadArea.style.background = '';
             const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
+            if (file && (file.type.startsWith('image/') || 
+                        file.name.toLowerCase().endsWith('.tif') || 
+                        file.name.toLowerCase().endsWith('.tiff'))) {
                 loadImage(file);
             }
         });
@@ -387,6 +391,93 @@
         });
 
         function loadImage(file) {
+            // Check if it's a TIFF file
+            const isTiff = file.type === 'image/tiff' || file.type === 'image/tif' || 
+                          file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff');
+            
+            if (isTiff) {
+                loadTiffImage(file);
+            } else {
+                loadRegularImage(file);
+            }
+        }
+        
+        async function loadTiffImage(file) {
+            try {
+                // Check if GeoTIFF is loaded
+                if (typeof GeoTIFF === 'undefined') {
+                    alert('TIFF support not available. Please try converting to PNG first.');
+                    return;
+                }
+                
+                // Read file as array buffer
+                const arrayBuffer = await file.arrayBuffer();
+                
+                // Parse TIFF using GeoTIFF
+                const tiff = await GeoTIFF.fromArrayBuffer(arrayBuffer);
+                const image = await tiff.getImage();
+                
+                // Get image dimensions
+                const width = image.getWidth();
+                const height = image.getHeight();
+                
+                // Read raster data
+                const rasters = await image.readRasters();
+                
+                // Create canvas
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                canvas.width = width;
+                canvas.height = height;
+                
+                // Create ImageData
+                const imageData = ctx.createImageData(width, height);
+                const data = imageData.data;
+                
+                // Convert raster data to RGBA
+                const samples = image.getSamplesPerPixel();
+                
+                if (samples >= 3) {
+                    // RGB or RGBA
+                    for (let i = 0; i < width * height; i++) {
+                        data[i * 4] = rasters[0][i];     // R
+                        data[i * 4 + 1] = rasters[1][i]; // G
+                        data[i * 4 + 2] = rasters[2][i]; // B
+                        data[i * 4 + 3] = samples >= 4 ? rasters[3][i] : 255; // A
+                    }
+                } else {
+                    // Grayscale
+                    for (let i = 0; i < width * height; i++) {
+                        const gray = rasters[0][i];
+                        data[i * 4] = gray;     // R
+                        data[i * 4 + 1] = gray; // G
+                        data[i * 4 + 2] = gray; // B
+                        data[i * 4 + 3] = 255;  // A
+                    }
+                }
+                
+                // Draw to canvas
+                ctx.putImageData(imageData, 0, 0);
+                
+                // Convert canvas to data URL and load into image
+                const dataURL = canvas.toDataURL('image/png');
+                displayImage.src = dataURL;
+                displayImage.style.display = 'block';
+                uploadArea.style.display = 'none';
+                imageContainer.classList.add('has-image');
+                
+                // Show image info
+                displayImage.onload = function() {
+                    setupImageDisplay(file);
+                };
+                
+            } catch (error) {
+                alert('Error loading TIFF file: ' + error.message + '\nPlease try converting the TIFF to PNG first.');
+                console.error('TIFF loading error:', error);
+            }
+        }
+        
+        function loadRegularImage(file) {
             const reader = new FileReader();
             reader.onload = function(e) {
                 displayImage.src = e.target.result;
@@ -396,39 +487,43 @@
                 
                 // Show image info
                 displayImage.onload = function() {
-                    // Reset aspect ratio borders for new image
-                    displayImage.aspectBorderLeft = 0;
-                    displayImage.aspectBorderRight = 0;
-                    displayImage.aspectBorderTop = 0;
-                    displayImage.aspectBorderBottom = 0;
-                    displayImage.aspectRatioX = null;
-                    displayImage.aspectRatioY = null;
-                    
-                    // Cache values for performance
-                    originalPixels = this.naturalWidth * this.naturalHeight;
-                    originalFileSize = file.size;
-                    originalFileName = file.name;
-                    originalFileType = file.type;
-                    dimensionsInfo = document.getElementById('dimensionsInfo');
-                    
-                    // Set up blur background when image loads
-                    const blurBackground = document.getElementById('blurBackground');
-                    blurBackground.style.backgroundImage = `url(${displayImage.src})`;
-                    blurBackgroundReady = true;
-                    
-                    const kb = (file.size / 1024).toFixed(1);
-                    imageInfo.innerHTML = `
-                        <strong>${file.name}</strong><br>
-                        ${this.naturalWidth} × ${this.naturalHeight}px<br>
-                        ${kb} KB
-                    `;
-                    imageInfo.style.display = 'block';
-                    dimensionsInfo.style.display = 'block';
-                    document.getElementById('aspectRatio').value = 'original';
-                    updateDimensions();
+                    setupImageDisplay(file);
                 };
             };
             reader.readAsDataURL(file);
+        }
+        
+        function setupImageDisplay(file) {
+            // Reset aspect ratio borders for new image
+            displayImage.aspectBorderLeft = 0;
+            displayImage.aspectBorderRight = 0;
+            displayImage.aspectBorderTop = 0;
+            displayImage.aspectBorderBottom = 0;
+            displayImage.aspectRatioX = null;
+            displayImage.aspectRatioY = null;
+            
+            // Cache values for performance
+            originalPixels = displayImage.naturalWidth * displayImage.naturalHeight;
+            originalFileSize = file.size;
+            originalFileName = file.name;
+            originalFileType = file.type;
+            dimensionsInfo = document.getElementById('dimensionsInfo');
+            
+            // Set up blur background when image loads
+            const blurBackground = document.getElementById('blurBackground');
+            blurBackground.style.backgroundImage = `url(${displayImage.src})`;
+            blurBackgroundReady = true;
+            
+            const kb = (file.size / 1024).toFixed(1);
+            imageInfo.innerHTML = `
+                <strong>${file.name}</strong><br>
+                ${displayImage.naturalWidth} × ${displayImage.naturalHeight}px<br>
+                ${kb} KB
+            `;
+            imageInfo.style.display = 'block';
+            dimensionsInfo.style.display = 'block';
+            document.getElementById('aspectRatio').value = 'original';
+            updateDimensions();
         }
 
         function clearImage() {
