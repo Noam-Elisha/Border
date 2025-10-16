@@ -308,16 +308,14 @@
             </div>
             
             <div class="control-group">
-                <label>Background Type:</label>
+                <label>Background Color:</label>
                 <select id="backgroundType" onchange="toggleBackgroundType()">
-                    <option value="color">Solid Color</option>
+                    <option value="#ffffff">White</option>
+                    <option value="#000000">Black</option>
                     <option value="blur">Blur Background</option>
+                    <option value="custom">Custom Color</option>
                 </select>
-            </div>
-            
-            <div class="control-group" id="colorGroup">
-                <label>Border Color:</label>
-                <input type="color" id="borderColor" value="#ffffff" onchange="applyBorderFast()">
+                <input type="color" id="customBackgroundColor" value="#ffffff" onchange="applyBorderFast()" style="display: none; margin-top: 10px;">
             </div>
             
             <div class="control-group">
@@ -544,8 +542,8 @@
             // Reset border controls
             document.getElementById('borderWidth').value = 0;
             document.getElementById('borderWidthValue').textContent = '0';
-            document.getElementById('borderColor').value = '#ffffff';
-            document.getElementById('backgroundType').value = 'color';
+            document.getElementById('backgroundType').value = '#ffffff';
+            document.getElementById('customBackgroundColor').value = '#ffffff';
             document.getElementById('aspectRatio').value = 'original';
             
             // Clear blur background
@@ -590,16 +588,31 @@
             }, 3); // ~60fps
         }
 
+        function getBackgroundColor() {
+            const backgroundType = document.getElementById('backgroundType').value;
+            
+            if (backgroundType === 'custom') {
+                return document.getElementById('customBackgroundColor').value;
+            } else {
+                return backgroundType; // Will be hex color or 'blur'
+            }
+        }
+
         function toggleBackgroundType() {
             const backgroundType = document.getElementById('backgroundType').value;
-            const colorGroup = document.getElementById('colorGroup');
+            const customColorPicker = document.getElementById('customBackgroundColor');
             const blurBackground = document.getElementById('blurBackground');
             
-            if (backgroundType === 'color') {
-                colorGroup.style.display = 'block';
-                blurBackground.classList.remove('active');
+            if (backgroundType === 'custom') {
+                customColorPicker.style.display = 'inline-block';
             } else {
-                colorGroup.style.display = 'none';
+                customColorPicker.style.display = 'none';
+            }
+            
+            if (backgroundType === 'blur') {
+                blurBackground.classList.add('active');
+            } else {
+                blurBackground.classList.remove('active');
             }
             
             // Apply border with new background type
@@ -685,12 +698,12 @@
 
                 
                 // Apply the borders and scaling
-                if (backgroundType === 'color') {
-                    const borderColor = document.getElementById('borderColor').value;
-                    displayImage.style.borderLeft = `${Math.round(finalBorderLeft * scaleToFit)}px solid ${borderColor}`;
-                    displayImage.style.borderRight = `${Math.round(finalBorderRight * scaleToFit)}px solid ${borderColor}`;
-                    displayImage.style.borderTop = `${Math.round(finalBorderTop * scaleToFit)}px solid ${borderColor}`;
-                    displayImage.style.borderBottom = `${Math.round(finalBorderBottom * scaleToFit)}px solid ${borderColor}`;
+                const backgroundColor = getBackgroundColor();
+                if (backgroundColor !== 'blur') {
+                    displayImage.style.borderLeft = `${Math.round(finalBorderLeft * scaleToFit)}px solid ${backgroundColor}`;
+                    displayImage.style.borderRight = `${Math.round(finalBorderRight * scaleToFit)}px solid ${backgroundColor}`;
+                    displayImage.style.borderTop = `${Math.round(finalBorderTop * scaleToFit)}px solid ${backgroundColor}`;
+                    displayImage.style.borderBottom = `${Math.round(finalBorderBottom * scaleToFit)}px solid ${backgroundColor}`;
                     displayImage.style.boxShadow = 'none';
                 } else {
                     // Use blur background
@@ -907,12 +920,11 @@
                     canvas.width = totalWidth;
                     canvas.height = totalHeight;
                     
-                    const backgroundType = document.getElementById('backgroundType').value;
+                    const backgroundColor = getBackgroundColor();
                     
-                    if (backgroundType === 'color') {
+                    if (backgroundColor !== 'blur') {
                         // Fill with solid color
-                        const borderColor = document.getElementById('borderColor').value;
-                        ctx.fillStyle = borderColor;
+                        ctx.fillStyle = backgroundColor;
                         ctx.fillRect(0, 0, totalWidth, totalHeight);
                     } else {
                         // Create blur background - draw the image larger and blurred first
