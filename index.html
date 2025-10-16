@@ -930,20 +930,18 @@
                     // Draw image centered with proper border positioning
                     ctx.drawImage(displayImage, Math.floor(finalBorderLeft), Math.floor(finalBorderTop));
                     
-                    // Download the image using original format
-                    const mimeType = originalFileType || 'image/png';
-                    const quality = mimeType === 'image/jpeg' ? 0.95 : undefined; // High quality for JPEG
+                    // Download the image as JPG only
+                    const mimeType = 'image/jpeg';
+                    const quality = 1; // High quality for JPEG
                     const dataURL = canvas.toDataURL(mimeType, quality);
                     
-                    // Generate filename with original extension
+                    // Generate filename with JPG extension
                     let filename = 'image-with-border';
                     if (originalFileName) {
                         const nameWithoutExt = originalFileName.replace(/\.[^/.]+$/, "");
-                        const ext = originalFileName.split('.').pop();
-                        filename = `${nameWithoutExt}-with-border.${ext}`;
+                        filename = `${nameWithoutExt}-with-border.jpg`;
                     } else {
-                        const ext = mimeType.split('/')[1] === 'jpeg' ? 'jpg' : mimeType.split('/')[1];
-                        filename = `${filename}.${ext}`;
+                        filename = `${filename}.jpg`;
                     }
                     
                     const a = document.createElement('a');
