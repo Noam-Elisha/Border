@@ -182,6 +182,78 @@
             margin-bottom: 10px;
         }
 
+        .control-group input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            background: #3c3c3c;
+            border: 1px solid #555;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 14px;
+            margin-top: 5px;
+            transition: background-color 0.3s, opacity 0.3s;
+        }
+
+        .control-group input[type="number"]:disabled {
+            background: #2a2a2a;
+            color: #666;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        /* Toggle Switch */
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #555;
+            transition: 0.3s;
+            border-radius: 24px;
+        }
+
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.3s;
+            border-radius: 50%;
+        }
+
+        .toggle-switch input:checked + .toggle-slider {
+            background-color: #007acc;
+        }
+
+        .toggle-switch input:checked + .toggle-slider:before {
+            transform: translateX(26px);
+        }
+
         .control-group input[type="range"] {
             width: 100%;
             margin-bottom: 10px;
@@ -298,6 +370,20 @@
                 <button onclick="document.getElementById('fileInput').click()">Choose File</button>
                 <button class="secondary" onclick="clearImage()">Clear Image</button>
                 <button onclick="exportImage()">Export Image</button>
+            </div>
+
+            <h2>Export Settings</h2>
+            
+            <div class="control-group">
+                <div class="toggle-container">
+                    <label>Limit File Size</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="limitFileSize" onchange="toggleFileSizeLimit()">
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <label>Max Size (MB):</label>
+                <input type="number" id="maxFileSizeMB" min="0.1" max="50" value="1" step="0.1" disabled>
             </div>
 
             <h2>Border Controls</h2>
@@ -512,16 +598,21 @@
             blurBackground.style.backgroundImage = `url(${displayImage.src})`;
             blurBackgroundReady = true;
             
-            const kb = (file.size / 1024).toFixed(1);
+            const mb = (file.size / 1024 / 1024).toFixed(2);
             imageInfo.innerHTML = `
                 <strong>${file.name}</strong><br>
                 ${displayImage.naturalWidth} × ${displayImage.naturalHeight}px<br>
-                ${kb} KB
+                ${mb} MB
             `;
             imageInfo.style.display = 'block';
             dimensionsInfo.style.display = 'block';
             document.getElementById('aspectRatio').value = 'original';
             updateDimensions();
+            
+            // Reset export settings
+            document.getElementById('limitFileSize').checked = false;
+            document.getElementById('maxFileSizeMB').disabled = true;
+            document.getElementById('maxFileSizeMB').value = 1;
         }
 
         function clearImage() {
@@ -618,6 +709,17 @@
             // Apply border with new background type
             if (displayImage.src) {
                 applyBorderFast();
+            }
+        }
+
+        function toggleFileSizeLimit() {
+            const limitCheckbox = document.getElementById('limitFileSize');
+            const fileSizeInput = document.getElementById('maxFileSizeMB');
+            
+            if (limitCheckbox.checked) {
+                fileSizeInput.disabled = false;
+            } else {
+                fileSizeInput.disabled = true;
             }
         }
 
@@ -731,13 +833,13 @@
                     const totalHeight = displayImage.naturalHeight + finalBorderTop + finalBorderBottom;
                     const newPixels = totalWidth * totalHeight;
                     const pixelRatio = newPixels / originalPixels;
-                    const estimatedSize = (originalFileSize * pixelRatio / 1024).toFixed(1);
+                    const estimatedSize = (originalFileSize * pixelRatio / 1024 / 1024).toFixed(2);
                     
                     dimensionsInfo.innerHTML = `
                         <strong>With Border:</strong><br>
 
                         ${Math.round(totalWidth)} × ${Math.round(totalHeight)}px<br>
-                        ${estimatedSize} KB
+                        ${estimatedSize} MB
                     `;
                 }
             }
@@ -942,10 +1044,48 @@
                     // Draw image centered with proper border positioning
                     ctx.drawImage(displayImage, Math.floor(finalBorderLeft), Math.floor(finalBorderTop));
                     
-                    // Download the image as JPG only
+                    // Check if file size limit is enabled
+                    const limitEnabled = document.getElementById('limitFileSize').checked;
+                    const maxFileSizeMB = parseFloat(document.getElementById('maxFileSizeMB').value);
+                    
                     const mimeType = 'image/jpeg';
-                    const quality = 1; // High quality for JPEG
-                    const dataURL = canvas.toDataURL(mimeType, quality);
+                    let quality = 1.0; // Start with highest quality
+                    let dataURL;
+                    
+                    if (limitEnabled && maxFileSizeMB > 0) {
+                        // Iteratively reduce quality until file size is under limit
+                        const maxFileSizeBytes = maxFileSizeMB * 1024 * 1024;
+                        let attempts = 0;
+                        const maxAttempts = 20;
+                        
+                        do {
+                            dataURL = canvas.toDataURL(mimeType, quality);
+                            
+                            // Calculate file size in bytes (base64 string is about 4/3 the size of binary)
+                            const base64Length = dataURL.split(',')[1].length;
+                            const fileSizeBytes = (base64Length * 3) / 4;
+                            
+                            if (fileSizeBytes <= maxFileSizeBytes) {
+                                // File size is acceptable
+                                console.log(`Export successful at ${(quality * 100).toFixed(0)}% quality (${(fileSizeBytes / 1024 / 1024).toFixed(2)} MB)`);
+                                break;
+                            }
+                            
+                            // Reduce quality for next iteration
+                            quality -= 0.05;
+                            attempts++;
+                            
+                        } while (attempts < maxAttempts && quality > 0.05);
+                        
+                        if (attempts >= maxAttempts) {
+                            alert(`Warning: Could not reduce file size to ${maxFileSizeMB} MB within quality limits. The exported file may be larger than requested.`);
+                        }
+                        
+                    } else {
+                        // No file size limit, use maximum quality
+                        dataURL = canvas.toDataURL(mimeType, quality);
+                        console.log('Export at 100% quality (no size limit)');
+                    }
                     
                     // Generate filename with JPG extension
                     let filename = 'image-with-border';
